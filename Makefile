@@ -28,6 +28,8 @@ RC := manifests/deis-${SHORT_NAME}-rc.yaml
 SVC := manifests/deis-${SHORT_NAME}-service.yaml
 IMAGE := ${DEIS_REGISTRY}${IMAGE_PREFIX}/${SHORT_NAME}:${VERSION}
 
+RCDF := manifests/deis-df${SHORT_NAME}-rc.yaml
+SVCDF := manifests/deis-df${SHORT_NAME}-service.yaml
 
 all:
 	@echo "Use a Makefile to control top-level building of the project."
