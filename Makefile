@@ -52,6 +52,9 @@ build:
 		$(call check-static-binary,$(BINARY_DEST_DIR)/$$i); \
 	done
 
+test:
+	go test ./pkg && go test ./pkg/confd && go test ./pkg/env && go test ./pkg/etcd && go test ./pkg/git && go test ./pkg/sshd
+
 docker-build: build
 	docker build --rm -t $(IMAGE) rootfs
 	perl -pi -e "s|image: [a-z0-9.:]+\/deis\/bp${SHORT_NAME}:[0-9a-z-.]+|image: ${IMAGE}|g" ${RC}
