@@ -20,7 +20,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// PrereceiveHookTmpl is a pre-receive hook.
+// PrereceiveHookTpl is a pre-receive hook script.
 //
 // This is overridable. The following template variables are passed into it:
 //
@@ -205,9 +205,8 @@ func createRepo(c cookoo.Context, repoPath, gitHome string) (bool, error) {
 		return true, nil
 	} else if err == nil {
 		return false, errors.New("Expected directory, found file.")
-	} else {
-		return false, err
 	}
+	return false, err
 }
 
 //prereceiveHook templates a pre-receive hook for Git.
