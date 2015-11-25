@@ -45,7 +45,8 @@ func RunOnce(c cookoo.Context, p *cookoo.Params) (interface{}, cookoo.Interrupt)
 	var lasterr error
 	start := time.Now()
 	for i := 0; i < limit; i++ {
-		if out, err := exec.Command("confd", dargs...).CombinedOutput(); err == nil {
+		out, err := exec.Command("confd", dargs...).CombinedOutput()
+		if err == nil {
 			log.Infof(c, "Templates generated for %s on run %d", node, i)
 			return out, nil
 		}
