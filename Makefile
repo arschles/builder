@@ -20,7 +20,7 @@ STANDALONE := extract-types  generate-buildhook yaml2json-procfile
 BINDIR := ./rootfs
 
 # Legacy support for DEV_REGISTRY, plus new support for DEIS_REGISTRY.
-DEV_REGISTRY ?= $$DEV_REGISTRY
+DEV_REGISTRY ?= $(shell docker-machine ip deis):5000
 DEIS_REGISTRY ?= ${DEV_REGISTRY}/
 
 # Kubernetes-specific information for RC, Service, and Image.
@@ -55,8 +55,8 @@ build:
 test:
 	go test ./pkg && go test ./pkg/confd && go test ./pkg/env && go test ./pkg/etcd && go test ./pkg/git && go test ./pkg/sshd
 
-docker-build: build
-	docker build --rm -t $(IMAGE) rootfs
+docker-build:
+	docker build --rm -t ${IMAGE} rootfs
 	perl -pi -e "s|image: [a-z0-9.:]+\/deis\/bp${SHORT_NAME}:[0-9a-z-.]+|image: ${IMAGE}|g" ${RC}
 
 # Push to a registry that Kubernetes can access.
