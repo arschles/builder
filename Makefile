@@ -26,7 +26,7 @@ DEIS_REGISTRY ?= ${DEV_REGISTRY}/
 # Kubernetes-specific information for RC, Service, and Image.
 RC := manifests/deis-${SHORT_NAME}-rc.yaml
 SVC := manifests/deis-${SHORT_NAME}-service.yaml
-IMAGE := ${DEIS_REGISTRY}${IMAGE_PREFIX}/${SHORT_NAME}:${VERSION}
+IMAGE := ${DEIS_REGISTRY}/${IMAGE_PREFIX}/${SHORT_NAME}:${VERSION}
 
 RCDF := manifests/deis-df${SHORT_NAME}-rc.yaml
 SVCDF := manifests/deis-df${SHORT_NAME}-service.yaml
