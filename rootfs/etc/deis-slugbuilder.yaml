@@ -11,7 +11,7 @@ spec:
   containers:
     - name: repo_name
       imagePullPolicy: Always
-      image: smothiki/slugbuilder:5.5
+      image: deisci/slugbuilder:v2-alpha
       env:
         - name: DEBUG
           value: "1"
