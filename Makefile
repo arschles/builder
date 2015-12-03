@@ -27,6 +27,7 @@ IMAGE_PREFIX ?= deis
 RC := manifests/deis-${SHORT_NAME}-rc.yaml
 SVC := manifests/deis-${SHORT_NAME}-service.yaml
 IMAGE := ${DEIS_REGISTRY}${IMAGE_PREFIX}/${SHORT_NAME}:${VERSION}
+SECRET := manifests/deis-${SHORT_NAME}-secret-user.yaml
 
 RCDF := manifests/deis-df${SHORT_NAME}-rc.yaml
 SVCDF := manifests/deis-df${SHORT_NAME}-service.yaml
@@ -75,8 +76,13 @@ kube-service:
 kube-rc:
 	kubectl create -f ${RC}
 
+kube-secret:
+	kubectl create -f ${SECRET}
+
 kube-clean:
 	kubectl delete rc deis-builder
+	kubectl delete svc deis-builder
+	kubectl delete secret deis-builder-minio-user
 
 test:
 	@echo "Implement functional tests in _tests directory"
