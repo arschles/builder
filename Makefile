@@ -1,7 +1,3 @@
-# Short name: Short name, following [a-zA-Z_], used all over the place.
-# Some uses for short name:
-# - Docker image name
-# - Kubernetes service, rc, pod, secret, volume names
 SHORT_NAME ?= builder
 
 # Enable vendor/ directory support.
@@ -27,7 +23,6 @@ IMAGE_PREFIX ?= deis
 RC := manifests/deis-${SHORT_NAME}-rc.yaml
 SVC := manifests/deis-${SHORT_NAME}-service.yaml
 IMAGE := ${DEIS_REGISTRY}${IMAGE_PREFIX}/${SHORT_NAME}:${VERSION}
-SECRET := manifests/deis-${SHORT_NAME}-secret-user.yaml
 
 RCDF := manifests/deis-df${SHORT_NAME}-rc.yaml
 SVCDF := manifests/deis-df${SHORT_NAME}-service.yaml
@@ -68,7 +63,7 @@ docker-push: docker-build
 deploy: kube-service kube-rc
 
 # Some things, like services, have to be deployed before pods. This is an
-# example target. Others could perhaps include kube-secret, kube-volume, etc.
+# example target. Others could perhaps include, kube-volume, etc.
 kube-service:
 	kubectl create -f ${SVC}
 
@@ -76,13 +71,9 @@ kube-service:
 kube-rc:
 	kubectl create -f ${RC}
 
-kube-secret:
-	kubectl create -f ${SECRET}
-
 kube-clean:
 	kubectl delete rc deis-builder
 	kubectl delete svc deis-builder
-	kubectl delete secret deis-builder-minio-user
 
 test:
 	@echo "Implement functional tests in _tests directory"
