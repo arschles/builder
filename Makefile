@@ -13,7 +13,6 @@ VERSION := 2.0.0-$(shell date "+%Y%m%d%H%M%S")
 BINARY_DEST_DIR := rootfs/usr/bin
 # Common flags passed into Go's linker.
 LDFLAGS := "-s -X main.version=${VERSION}"
-IMAGE_PREFIX ?= deis
 BINARIES := extract-domain extract-types extract-version generate-buildhook get-app-config get-app-values publish-release-controller yaml2json-procfile
 STANDALONE := extract-types  generate-buildhook yaml2json-procfile
 # Docker Root FS
@@ -61,7 +60,7 @@ docker-build:
 	perl -pi -e "s|image: [a-z0-9.:]+\/deis\/bp${SHORT_NAME}:[0-9a-z-.]+|image: ${IMAGE}|g" ${RC}
 
 # Push to a registry that Kubernetes can access.
-docker-push:
+docker-push: docker-build
 	docker push ${IMAGE}
 
 # Deploy is a Kubernetes-oriented target
