@@ -28,13 +28,13 @@ spec:
       volumeMounts:
         - mountPath: /var/run/docker.sock
           name: docker-socket
-        - name: object-store
+        - name: deis-builder-minio
           mountPath: /var/run/secrets/object/store
           readOnly: true
   volumes:
-    - name: object-store
+    - name: deis-builder-minio
       secret:
-        secretName: object-store
+        secretName: deis-builder-minio
     - name: docker-socket
       hostPath:
         path: /var/run/docker.sock
