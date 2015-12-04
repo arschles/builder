@@ -20,10 +20,10 @@ spec:
         - name : put_url
           value: puturl
       volumeMounts:
-        - name: deis-builder-minio
+        - name: minio-user
           mountPath: /var/run/secrets/object/store
           readOnly: true
   volumes:
-    - name: deis-builder-minio
+    - name: minio-user
       secret:
-        secretName: deis-builder-minio
+        secretName: minio-user
