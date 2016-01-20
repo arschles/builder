@@ -2,7 +2,6 @@
 include makeup.mk
 # makeup-managed:end
 
-GO_CLI_MAIN := boot.go
 ORG_NAME := deis
 PROJECT_NAME := builder
 BINARY_DEST_DIR := rootfs/usr/bin
