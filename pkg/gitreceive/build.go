@@ -1,14 +1,12 @@
 package gitreceive
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/deis/builder/pkg"
 	"github.com/deis/builder/pkg/gitreceive/log"
@@ -16,6 +14,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 )
 
 const (
@@ -158,7 +157,7 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 	if usingDockerfile {
 		pod = dockerBuilderPod(
 			conf.Debug,
-			storageCreds != nil,
+			creds != nil,
 			dockerBuilderPodName(appName, shortSha),
 			conf.PodNamespace,
 			"deis",
@@ -169,7 +168,7 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 	} else {
 		pod = slugbuilderPod(
 			conf.Debug,
-			storageCreds != nil,
+			creds != nil,
 			slugBuilderPodName(appName, shortSha),
 			conf.PodNamespace,
 			"deis",
@@ -180,40 +179,45 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 		)
 	}
 
-	newPod, err := kubeClient.Pods(conf.PodNamespace).Create(pod)
+	podsInterface := kubeClient.Pods(conf.PodNamespace)
+
+	newPod, err := podsInterface.Create(pod)
 	if err != nil {
 		return fmt.Errorf("creating builder pod (%s)", err)
 	}
 
-	// poll kubectl every 100ms to determine when the build pod is running
-	// TODO: use the k8s client and watch the event stream instead (https://github.com/deis/builder/issues/65)
-	for {
-		cmd := kGetCmd(conf.PodNamespace, buildPodName)
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		// ignore errors
-		run(cmd)
-		outStr := string(out.Bytes())
-		if strings.Contains(outStr, "phase: Running") {
-			break
-		} else if strings.Contains(outStr, "phase: Failed") {
-			return fmt.Errorf("build pod %s entered phase: Failed", buildPodName)
-		}
-		time.Sleep(100 * time.Millisecond)
+	watcher, err := podsInterface.Watch(api.ListOptions{
+		Kind:          podKind,
+		FieldSelector: fields.OneTermEqualSelector("name", pod.Name),
+		Watch:         bool,
+	})
+
+	if err != nil {
+		return fmt.Errorf("watching events for builder pod startup")
 	}
 
-	// get logs from the builder pod
-	kLogsCmd := exec.Command(
-		"kubectl",
-		fmt.Sprintf("--namespace=%s", conf.PodNamespace),
-		"logs",
-		"-f",
-		buildPodName,
-	)
-	kLogsCmd.Stdout = os.Stdout
-	if err := run(kLogsCmd); err != nil {
-		return fmt.Errorf("running %s to get builder logs (%s)", strings.Join(kLogsCmd.Args, " "), err)
+	ch := watcher.ResultChan()
+	for evt := range ch {
+		if evt.Type == watch.Added {
+			watcher.Stop()
+			break
+		} else if evt.Type == watch.Error {
+			watcher.Stop()
+			return fmt.Errorf("builder pod failed to launch with ERROR")
+		}
 	}
+
+	req := podsInterface.GetLogs(newPod.Name, &api.PodLogOptions{
+		Follow:   true,
+		Previous: true,
+	})
+
+	rc, err := req.Stream()
+	if err != nil {
+		return fmt.Errorf("attempting to stream logs (%s)", err)
+	}
+
+	// TODO: use a bufio Scanner to stream the logs
 
 	// poll the s3 server to ensure the slug exists
 	for {
