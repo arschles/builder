@@ -134,6 +134,11 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 		}
 	}
 
+	configDir := "/var/minio-conf"
+	if err := os.MkdirAll(configDir, os.ModePerm); err != nil {
+		return fmt.Errorf("creating minio config file (%s)", err)
+	}
+
 	configCmd := mcCmd(configDir, "config", "host", "add", fmt.Sprintf("%s://%s:%s", storage.schema(), storage.host(), storage.port()), creds.key, creds.secret)
 	if err := run(configCmd); err != nil {
 		return fmt.Errorf("configuring the minio client (%s)", err)
