@@ -155,15 +155,14 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 		return fmt.Errorf("copying %s to %s (%s)", appTgz, tarURL, err)
 	}
 
-	log.Info("Starting build... but first, coffee!")
-	log.Debug("Starting pod %s", buildPodName)
-
 	var pod *api.Pod
+	var buildPodName string
 	if usingDockerfile {
+		buildPodName = dockerBuilderPodName(appName, shortSha)
 		pod = dockerBuilderPod(
 			conf.Debug,
 			creds != nil,
-			dockerBuilderPodName(appName, shortSha),
+			buildPodName,
 			conf.PodNamespace,
 			"deis",
 			"2.0.0-beta",
@@ -171,10 +170,11 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 			imageName,
 		)
 	} else {
+		buildPodName = slugBuilderPodName(appName, shortSha)
 		pod = slugbuilderPod(
 			conf.Debug,
 			creds != nil,
-			slugBuilderPodName(appName, shortSha),
+			buildPodName,
 			conf.PodNamespace,
 			"deis",
 			"2.0.0-beta",
@@ -183,6 +183,8 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 			buildPackURL,
 		)
 	}
+	log.Info("Starting build... but first, coffee!")
+	log.Debug("Starting pod %s", buildPodName)
 
 	podsInterface := kubeClient.Pods(conf.PodNamespace)
 
