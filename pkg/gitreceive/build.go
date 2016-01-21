@@ -153,11 +153,12 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 
 	log.Info("Starting build... but first, coffee!")
 	log.Debug("Starting pod %s", buildPodName)
+
 	var pod *api.Pod
-	if storage == nil && usingDockerfile {
+	if usingDockerfile {
 		pod = dockerBuilderPod(
 			conf.Debug,
-			false,
+			storageCreds != nil,
 			dockerBuilderPodName(appName, shortSha),
 			conf.PodNamespace,
 			"deis",
@@ -165,33 +166,10 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 			tarURL,
 			imageName,
 		)
-	} else if storage != nil && usingDockerfile {
-		pod = dockerBuilderPod(
-			conf.Debug,
-			true,
-			dockerBuilderPodName(appName, shortSha),
-			conf.PodNamespace,
-			"deis",
-			"2.0.0-beta",
-			tarURL,
-			imageName,
-		)
-	} else if storage == nil && !usingDockerfile {
+	} else {
 		pod = slugbuilderPod(
 			conf.Debug,
-			false,
-			slugBuilderPodName(appName, shortSha),
-			conf.PodNamespace,
-			"deis",
-			"2.0.0-beta",
-			tarURL,
-			pushURL,
-			buildPackURL,
-		)
-	} else if storage != nil && !usingDockerfile {
-		pod = slugbuilderPod(
-			conf.Debug,
-			true,
+			storageCreds != nil,
 			slugBuilderPodName(appName, shortSha),
 			conf.PodNamespace,
 			"deis",
@@ -201,6 +179,7 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 			buildPackURL,
 		)
 	}
+
 	newPod, err := kubeClient.Pods(conf.PodNamespace).Create(pod)
 	if err != nil {
 		return fmt.Errorf("creating builder pod (%s)", err)
