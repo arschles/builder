@@ -191,12 +191,7 @@ func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) e
 		return fmt.Errorf("creating builder pod (%s)", err)
 	}
 
-	watcher, err := podsInterface.Watch(api.ListOptions{
-		Kind:          podKind,
-		FieldSelector: fields.OneTermEqualSelector("name", pod.Name),
-		Watch:         bool,
-	})
-
+	watcher, err := podsInterface.Watch(labels.Nothing(), fields.OneTermEqualSelector("name", pod.Name), v1Version)
 	if err != nil {
 		return fmt.Errorf("watching events for builder pod startup")
 	}
