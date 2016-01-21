@@ -14,6 +14,8 @@ import (
 	"github.com/deis/builder/pkg/gitreceive/log"
 	"github.com/pborman/uuid"
 	"gopkg.in/yaml.v2"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -45,10 +47,6 @@ func mcCmd(configDir string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func kGetCmd(podNS, podName string) *exec.Cmd {
-	return exec.Command("kubectl", fmt.Sprintf("--namespace=%s", podNS), "get", "pods", "-o", "yaml", podName)
-}
-
 // run prints the command it will execute to the debug log, then runs it and returns the result of run
 func run(cmd *exec.Cmd) error {
 	cmdStr := strings.Join(cmd.Args, " ")
@@ -60,7 +58,7 @@ func run(cmd *exec.Cmd) error {
 	return cmd.Run()
 }
 
-func build(conf *Config, builderKey, gitSha string) error {
+func build(conf *Config, kubeClient *client.Client, builderKey, gitSha string) error {
 	storage, err := getStorageConfig()
 	if err != nil {
 		return err
@@ -137,58 +135,6 @@ func build(conf *Config, builderKey, gitSha string) error {
 		}
 	}
 
-	var srcManifest string
-	if creds == nil {
-		// both key and secret are missing, proceed with no credentials
-		if usingDockerfile {
-			srcManifest = "/etc/deis-dockerbuilder-no-creds.yaml"
-		} else {
-			srcManifest = "/etc/deis-slugbuilder-no-creds.yaml"
-		}
-	} else if err == nil {
-		// both key and secret are in place, so proceed with credentials
-		if usingDockerfile {
-			srcManifest = "/etc/deis-dockerbuilder.yaml"
-		} else {
-			srcManifest = "/etc/deis-slugbuilder.yaml"
-		}
-	} else if err != nil {
-		// unexpected error, fail
-		return fmt.Errorf("unexpected error (%s)", err)
-	}
-
-	fileBytes, err := ioutil.ReadFile(srcManifest)
-	if err != nil {
-		return fmt.Errorf("reading kubernetes manifest %s (%s)", srcManifest, err)
-	}
-
-	finalManifestFileLocation := fmt.Sprintf("/etc/%s", slugName)
-	var buildPodName string
-	var finalManifest string
-	uid := uuid.New()[:8]
-	if usingDockerfile {
-		buildPodName = fmt.Sprintf("dockerbuild-%s-%s-%s", appName, shortSha, uid)
-		finalManifest = strings.Replace(string(fileBytes), "repo_name", buildPodName, -1)
-		finalManifest = strings.Replace(finalManifest, "puturl", pushURL, -1)
-		finalManifest = strings.Replace(finalManifest, "tar-url", tarURL, -1)
-	} else {
-		buildPodName = fmt.Sprintf("slugbuild-%s-%s-%s", appName, shortSha, uid)
-		finalManifest = strings.Replace(string(fileBytes), "repo_name", buildPodName, -1)
-		finalManifest = strings.Replace(finalManifest, "puturl", pushURL, -1)
-		finalManifest = strings.Replace(finalManifest, "tar-url", tarURL, -1)
-		finalManifest = strings.Replace(finalManifest, "buildurl", buildPackURL, -1)
-	}
-
-	log.Debug("writing builder manifest to %s", finalManifestFileLocation)
-	if err := ioutil.WriteFile(finalManifestFileLocation, []byte(finalManifest), os.ModePerm); err != nil {
-		return fmt.Errorf("writing final manifest %s (%s)", finalManifestFileLocation, err)
-	}
-
-	configDir := "/var/minio-conf"
-	if err := os.MkdirAll(configDir, os.ModePerm); err != nil {
-		return fmt.Errorf("creating minio config file (%s)", err)
-	}
-
 	configCmd := mcCmd(configDir, "config", "host", "add", fmt.Sprintf("%s://%s:%s", storage.schema(), storage.host(), storage.port()), creds.key, creds.secret)
 	if err := run(configCmd); err != nil {
 		return fmt.Errorf("configuring the minio client (%s)", err)
@@ -207,18 +153,56 @@ func build(conf *Config, builderKey, gitSha string) error {
 
 	log.Info("Starting build... but first, coffee!")
 	log.Debug("Starting pod %s", buildPodName)
-	kCreateCmd := exec.Command(
-		"kubectl",
-		fmt.Sprintf("--namespace=%s", conf.PodNamespace),
-		"create",
-		"-f",
-		finalManifestFileLocation,
-	)
-	if log.IsDebugging {
-		kCreateCmd.Stdout = os.Stdout
+	var pod *api.Pod
+	if storage == nil && usingDockerfile {
+		pod = dockerBuilderPod(
+			conf.Debug,
+			false,
+			dockerBuilderPodName(appName, shortSha),
+			conf.PodNamespace,
+			"deis",
+			"2.0.0-beta",
+			tarURL,
+			imageName,
+		)
+	} else if storage != nil && usingDockerfile {
+		pod = dockerBuilderPod(
+			conf.Debug,
+			true,
+			dockerBuilderPodName(appName, shortSha),
+			conf.PodNamespace,
+			"deis",
+			"2.0.0-beta",
+			tarURL,
+			imageName,
+		)
+	} else if storage == nil && !usingDockerfile {
+		pod = slugbuilderPod(
+			conf.Debug,
+			false,
+			slugBuilderPodName(appName, shortSha),
+			conf.PodNamespace,
+			"deis",
+			"2.0.0-beta",
+			tarURL,
+			pushURL,
+			buildPackURL,
+		)
+	} else if storage != nil && !usingDockerfile {
+		pod = slugbuilderPod(
+			conf.Debug,
+			true,
+			slugBuilderPodName(appName, shortSha),
+			conf.PodNamespace,
+			"deis",
+			"2.0.0-beta",
+			tarURL,
+			pushURL,
+			buildPackURL,
+		)
 	}
-	kCreateCmd.Stderr = os.Stderr
-	if err := run(kCreateCmd); err != nil {
+	newPod, err := kubeClient.Pods(conf.PodNamespace).Create(pod)
+	if err != nil {
 		return fmt.Errorf("creating builder pod (%s)", err)
 	}
 
