@@ -1,4 +1,4 @@
-FROM alpine:3.1
+FROM alpine:3.3
 
 # install git and configure gituser
 ENV GITHOME /home/git
